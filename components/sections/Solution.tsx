@@ -1,0 +1,7 @@
+import { Brain, ShieldCheck, PackageCheck } from "lucide-react";
+import { Container } from "@/components/ui/Container";
+import { SectionTitle } from "@/components/ui/SectionTitle";
+const items = [{ title: "Project Brain", description: "Keeps the project alive across ChatGPT, Gemini, Claude, Cursor and future AI tools.", icon: Brain }, { title: "Protection Runtime", description: "Forces change plans, risk checks, verification and rollback before AI breaks your project.", icon: ShieldCheck }, { title: "Exportable Project Pack", description: "Creates PRD, architecture, tasks, AI rules and handoff files that any AI or developer can continue.", icon: PackageCheck }];
+export function Solution() {
+  return <section className="bg-primary py-24 text-white dark:bg-slate-950"><Container><SectionTitle eyebrow="The Solution" title="A Product Operating System Above AI Tools" description="DevCommander OS does not replace AI models. It gives them memory, rules, structure, protection and execution discipline." /><div className="grid gap-6 md:grid-cols-3">{items.map((item) => { const Icon = item.icon; return <div key={item.title} className="rounded-2xl border border-white/10 bg-white/5 p-6"><Icon className="mb-5 text-brandCyan" size={28} /><h3 className="text-lg font-semibold">{item.title}</h3><p className="mt-3 text-sm leading-6 text-slate-300">{item.description}</p></div>; })}</div></Container></section>;
+}

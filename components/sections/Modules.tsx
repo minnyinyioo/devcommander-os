@@ -1,0 +1,6 @@
+import { modules } from "@/data/modules";
+import { Container } from "@/components/ui/Container";
+import { SectionTitle } from "@/components/ui/SectionTitle";
+export function Modules() {
+  return <section id="modules" className="bg-white py-24 dark:bg-slate-950"><Container><SectionTitle eyebrow="Runtime Modules" title="Built to Solve Real AI Development Problems" description="Each module protects a real part of the AI product development lifecycle." /><div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">{modules.map((m) => { const Icon = m.icon; return <div key={m.title} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-xl dark:border-white/10 dark:bg-white/[0.03]"><div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-brandBlue dark:bg-brandCyan/10 dark:text-brandCyan"><Icon size={26} /></div><div className="mb-3 inline-flex rounded-full bg-slate-100 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:bg-white/10 dark:text-brandCyan">{m.status}</div><h3 className="text-lg font-semibold text-primary dark:text-white">{m.title}</h3><p className="mt-3 text-sm leading-6 text-mutedText dark:text-slate-400">{m.description}</p></div>; })}</div></Container></section>;
+}
