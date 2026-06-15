@@ -22,11 +22,12 @@ import {
 } from "@/lib/project/storage-adapter";
 import {
   mergeProjectLists,
-  ProjectListItem,
   readCloudProjectList,
   readLocalProjectList,
   writeLocalRecentProjects,
 } from "@/lib/project/project-list-adapter";
+import type { ProjectListItem } from "@/lib/project/project-list-adapter";
+import { isSupabaseConfigured } from "@/lib/supabase/browser-client";
 import type { RuntimeSection } from "@/lib/project/project-runtime";
 
 type GeneratedProject = {
@@ -94,6 +95,7 @@ function getSourceLabel(source: ProjectListItem["source"]): string {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const supabaseConfigured = isSupabaseConfigured();
 
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
@@ -162,18 +164,18 @@ export default function DashboardPage() {
       await saveProjectRuntimeHybrid(project);
 
       const newProjectItem: ProjectListItem = {
-  projectId: project.projectId,
-  input: project.input,
-  createdAt: project.createdAt,
-  source: "local",
-};
+        projectId: project.projectId,
+        input: project.input,
+        createdAt: project.createdAt,
+        source: "local",
+      };
 
-const nextRecentProjects: ProjectListItem[] = [
-  newProjectItem,
-  ...recentProjects.filter(
-    (recentProject) => recentProject.projectId !== project.projectId,
-  ),
-].slice(0, MAX_RECENT_PROJECTS);
+      const nextRecentProjects: ProjectListItem[] = [
+        newProjectItem,
+        ...recentProjects.filter(
+          (recentProject) => recentProject.projectId !== project.projectId,
+        ),
+      ].slice(0, MAX_RECENT_PROJECTS);
 
       setRecentProjects(nextRecentProjects);
       writeLocalRecentProjects(nextRecentProjects);
@@ -202,87 +204,110 @@ const nextRecentProjects: ProjectListItem[] = [
     await deleteProjectRuntimeHybrid(projectId);
   }
 
-  const localCount = recentProjects.filter((project) => project.source === "local")
-    .length;
-  const cloudCount = recentProjects.filter((project) => project.source === "cloud")
-    .length;
-  const hybridCount = recentProjects.filter((project) => project.source === "hybrid")
-    .length;
+  const localCount = recentProjects.filter(
+    (project) => project.source === "local",
+  ).length;
+
+  const cloudCount = recentProjects.filter(
+    (project) => project.source === "cloud",
+  ).length;
+
+  const hybridCount = recentProjects.filter(
+    (project) => project.source === "hybrid",
+  ).length;
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(63,63,70,0.35),_transparent_35%),#09090b] px-4 py-6 text-white sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(63,63,70,0.35),_transparent_35%),#09090b] px-4 py-5 text-white sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        <header className="flex flex-col gap-6 border-b border-white/10 pb-8 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="flex flex-wrap items-center gap-3">
-              <Link
-                href="/"
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-zinc-300 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
-              >
-                <Home className="h-4 w-4" />
-                Back to Home
-              </Link>
+        <header className="border-b border-white/10 pb-8">
+          <div className="rounded-[2rem] border border-white/10 bg-white/[0.035] px-4 py-3 shadow-2xl shadow-black/20 backdrop-blur">
+            <div className="flex w-full items-center justify-between gap-4 overflow-x-auto">
+              <div className="flex min-w-max items-center gap-2">
+                <Link
+                  href="/"
+                  className="inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-full border border-white/10 bg-black/20 px-4 text-xs font-medium text-zinc-300 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
+                >
+                  <Home className="h-3.5 w-3.5" />
+                  Back Home
+                </Link>
 
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-zinc-300">
-                <LayoutDashboard className="h-4 w-4" />
-                Runtime Alpha 0.9
+                <span className="inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-full border border-white/10 bg-black/20 px-4 text-xs font-medium text-zinc-300">
+                  <LayoutDashboard className="h-3.5 w-3.5" />
+                  Runtime Alpha 0.9
+                </span>
+
+                <span
+                  className={`inline-flex h-9 items-center whitespace-nowrap rounded-full px-4 text-xs font-semibold ring-1 ${
+                    supabaseConfigured
+                      ? "bg-emerald-500/10 text-emerald-300 ring-emerald-400/20"
+                      : "bg-amber-500/10 text-amber-200 ring-amber-400/20"
+                  }`}
+                >
+                  {supabaseConfigured ? "Cloud Ready" : "Local Mode"}
+                </span>
               </div>
 
-              <AuthMenu />
+              <div className="flex min-w-max items-center justify-end">
+                <AuthMenu />
+              </div>
             </div>
-
-            <h1 className="mt-6 max-w-4xl text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-              DevCommander OS Dashboard
-            </h1>
-
-            <p className="mt-5 max-w-3xl text-base leading-8 text-zinc-400">
-              Transform one product idea into Project Brain, Enterprise PRD,
-              Architecture, Tasks, and Export Pack.
-            </p>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 lg:w-[340px]">
-            <div className="flex items-center justify-between gap-4">
-              <p className="text-sm text-zinc-400">Storage Mode</p>
+          <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_300px] lg:items-start">
+            <div>
+              <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-white sm:text-5xl">
+                DevCommander OS Dashboard
+              </h1>
 
-              <button
-                type="button"
-                onClick={() => void loadProjects()}
-                disabled={projectListState === "loading"}
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:border-white/20 hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <RefreshCw
-                  className={`h-3.5 w-3.5 ${
-                    projectListState === "loading" ? "animate-spin" : ""
-                  }`}
-                />
-                Refresh
-              </button>
+              <p className="mt-5 max-w-3xl text-base leading-8 text-zinc-400">
+                Transform one product idea into Project Brain, Enterprise PRD,
+                Architecture, Tasks, and Export Pack.
+              </p>
             </div>
 
-            <div className="mt-4 grid gap-3 text-sm text-zinc-300">
-              <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-                <span className="flex items-center gap-3">
-                  <Brain className="h-4 w-4 text-zinc-500" />
-                  Local
-                </span>
-                <span className="text-zinc-400">{localCount}</span>
+            <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
+              <div className="flex items-center justify-between gap-4">
+                <p className="text-sm text-zinc-400">Storage Mode</p>
+
+                <button
+                  type="button"
+                  onClick={() => void loadProjects()}
+                  disabled={projectListState === "loading"}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:border-white/20 hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <RefreshCw
+                    className={`h-3.5 w-3.5 ${
+                      projectListState === "loading" ? "animate-spin" : ""
+                    }`}
+                  />
+                  Refresh
+                </button>
               </div>
 
-              <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-                <span className="flex items-center gap-3">
-                  <Cloud className="h-4 w-4 text-zinc-500" />
-                  Cloud
-                </span>
-                <span className="text-zinc-400">{cloudCount}</span>
-              </div>
+              <div className="mt-4 grid gap-3 text-sm text-zinc-300">
+                <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+                  <span className="flex items-center gap-3">
+                    <Brain className="h-4 w-4 text-zinc-500" />
+                    Local
+                  </span>
+                  <span className="text-zinc-400">{localCount}</span>
+                </div>
 
-              <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-                <span className="flex items-center gap-3">
-                  <FileText className="h-4 w-4 text-zinc-500" />
-                  Hybrid
-                </span>
-                <span className="text-zinc-400">{hybridCount}</span>
+                <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+                  <span className="flex items-center gap-3">
+                    <Cloud className="h-4 w-4 text-zinc-500" />
+                    Cloud
+                  </span>
+                  <span className="text-zinc-400">{cloudCount}</span>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+                  <span className="flex items-center gap-3">
+                    <FileText className="h-4 w-4 text-zinc-500" />
+                    Hybrid
+                  </span>
+                  <span className="text-zinc-400">{hybridCount}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -320,8 +345,8 @@ const nextRecentProjects: ProjectListItem[] = [
 
             {projectListState === "failed" ? (
               <div className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-100">
-                Cloud projects could not be loaded. LocalStorage fallback is still
-                active.
+                Cloud projects could not be loaded. LocalStorage fallback is
+                still active.
               </div>
             ) : null}
 
