@@ -9,18 +9,23 @@ export type ProjectListItem = {
   input: string;
   createdAt?: string;
   source: ProjectListSource;
+  workspaceId?: string | null;
+  workspaceName?: string;
 };
 
 type LocalRecentProject = {
   projectId: string;
   input: string;
   createdAt?: string;
+  workspaceId?: string | null;
+  workspaceName?: string;
 };
 
 type SupabaseProjectRow = {
   id: string;
   input: string;
   created_at: string | null;
+  workspace_id: string | null;
 };
 
 const RECENT_PROJECTS_KEY = "devcommander-recent-projects";
@@ -40,11 +45,15 @@ function isLocalRecentProject(value: unknown): value is LocalRecentProject {
     record.projectId.trim().length > 0 &&
     typeof record.input === "string" &&
     record.input.trim().length > 0 &&
-    (record.createdAt === undefined || typeof record.createdAt === "string")
+    (record.createdAt === undefined || typeof record.createdAt === "string") &&
+    (record.workspaceId === undefined ||
+      record.workspaceId === null ||
+      typeof record.workspaceId === "string") &&
+    (record.workspaceName === undefined || typeof record.workspaceName === "string")
   );
 }
 
-export function readLocalProjectList(): ProjectListItem[] {
+export function readLocalProjectList(workspaceId?: string | null): ProjectListItem[] {
   if (!isBrowser()) return [];
 
   const saved = window.localStorage.getItem(RECENT_PROJECTS_KEY);
@@ -58,12 +67,19 @@ export function readLocalProjectList(): ProjectListItem[] {
 
     return parsed
       .filter(isLocalRecentProject)
+      .filter((project) => {
+        if (workspaceId === undefined) return true;
+
+        return (project.workspaceId ?? null) === workspaceId;
+      })
       .slice(0, MAX_PROJECTS)
       .map((project) => ({
         projectId: project.projectId,
         input: project.input,
         createdAt: project.createdAt,
         source: "local",
+        workspaceId: project.workspaceId ?? null,
+        workspaceName: project.workspaceName,
       }));
   } catch {
     return [];
@@ -80,11 +96,14 @@ function isSupabaseProjectRow(value: unknown): value is SupabaseProjectRow {
     record.id.trim().length > 0 &&
     typeof record.input === "string" &&
     record.input.trim().length > 0 &&
-    (record.created_at === null || typeof record.created_at === "string")
+    (record.created_at === null || typeof record.created_at === "string") &&
+    (record.workspace_id === null || typeof record.workspace_id === "string")
   );
 }
 
-export async function readCloudProjectList(): Promise<ProjectListItem[]> {
+export async function readCloudProjectList(
+  workspaceId?: string | null,
+): Promise<ProjectListItem[]> {
   const supabase = getSupabaseBrowserClient();
 
   if (!supabase) return [];
@@ -96,12 +115,21 @@ export async function readCloudProjectList(): Promise<ProjectListItem[]> {
 
   if (userError || !user) return [];
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("projects")
-    .select("id,input,created_at")
-    .eq("user_id", user.id)
+    .select("id,input,created_at,workspace_id")
     .order("created_at", { ascending: false })
     .limit(MAX_PROJECTS);
+
+  if (workspaceId === null) {
+    query = query.is("workspace_id", null);
+  }
+
+  if (typeof workspaceId === "string" && workspaceId.trim()) {
+    query = query.eq("workspace_id", workspaceId);
+  }
+
+  const { data, error } = await query;
 
   if (error || !Array.isArray(data)) return [];
 
@@ -110,6 +138,7 @@ export async function readCloudProjectList(): Promise<ProjectListItem[]> {
     input: project.input,
     createdAt: project.created_at ?? undefined,
     source: "cloud",
+    workspaceId: project.workspace_id,
   }));
 }
 
@@ -131,9 +160,12 @@ export function mergeProjectLists({
 
     if (existing) {
       map.set(project.projectId, {
+        ...existing,
         ...project,
         input: project.input || existing.input,
         createdAt: project.createdAt ?? existing.createdAt,
+        workspaceId: project.workspaceId ?? existing.workspaceId ?? null,
+        workspaceName: existing.workspaceName,
         source: "hybrid",
       });
     } else {
@@ -158,6 +190,8 @@ export function writeLocalRecentProjects(projects: ProjectListItem[]): void {
     projectId: project.projectId,
     input: project.input,
     createdAt: project.createdAt,
+    workspaceId: project.workspaceId ?? null,
+    workspaceName: project.workspaceName,
   }));
 
   window.localStorage.setItem(RECENT_PROJECTS_KEY, JSON.stringify(localShape));

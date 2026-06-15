@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Brain,
+  Building2,
   Clock3,
   Cloud,
   FileText,
@@ -28,6 +29,8 @@ import {
 } from "@/lib/project/project-list-adapter";
 import type { ProjectListItem } from "@/lib/project/project-list-adapter";
 import { isSupabaseConfigured } from "@/lib/supabase/browser-client";
+import { listMyWorkspaces } from "@/lib/workspace/workspace-adapter";
+import type { WorkspaceRecord } from "@/lib/workspace/workspace-types";
 import type { RuntimeSection } from "@/lib/project/project-runtime";
 
 type GeneratedProject = {
@@ -44,8 +47,10 @@ type GeneratedProject = {
 };
 
 type ProjectListLoadState = "idle" | "loading" | "loaded" | "failed";
+type WorkspaceLoadState = "idle" | "loading" | "loaded" | "failed";
 
 const MAX_RECENT_PROJECTS = 10;
+const PERSONAL_WORKSPACE_ID = "personal";
 
 function formatDate(value?: string): string {
   if (!value) return "No date";
@@ -76,14 +81,8 @@ function normalizeGeneratedProject(data: GeneratedProject): GeneratedProject {
 }
 
 function getSourceBadgeClass(source: ProjectListItem["source"]): string {
-  if (source === "cloud") {
-    return "bg-sky-500/10 text-sky-300 ring-sky-400/20";
-  }
-
-  if (source === "hybrid") {
-    return "bg-emerald-500/10 text-emerald-300 ring-emerald-400/20";
-  }
-
+  if (source === "cloud") return "bg-sky-500/10 text-sky-300 ring-sky-400/20";
+  if (source === "hybrid") return "bg-emerald-500/10 text-emerald-300 ring-emerald-400/20";
   return "bg-zinc-800 text-zinc-400 ring-white/10";
 }
 
@@ -102,14 +101,53 @@ export default function DashboardPage() {
   const [recentProjects, setRecentProjects] = useState<ProjectListItem[]>([]);
   const [projectListState, setProjectListState] =
     useState<ProjectListLoadState>("idle");
+  const [workspaceLoadState, setWorkspaceLoadState] =
+    useState<WorkspaceLoadState>("idle");
+  const [workspaces, setWorkspaces] = useState<WorkspaceRecord[]>([]);
+  const [activeWorkspaceId, setActiveWorkspaceId] =
+    useState<string>(PERSONAL_WORKSPACE_ID);
   const [error, setError] = useState("");
 
-  async function loadProjects() {
+  const selectedWorkspace = useMemo(() => {
+    if (activeWorkspaceId === PERSONAL_WORKSPACE_ID) return null;
+
+    return workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null;
+  }, [activeWorkspaceId, workspaces]);
+
+  const activeWorkspaceFilter = useMemo(() => {
+    return activeWorkspaceId === PERSONAL_WORKSPACE_ID ? null : activeWorkspaceId;
+  }, [activeWorkspaceId]);
+
+  async function loadWorkspaces() {
+    if (!supabaseConfigured) {
+      setWorkspaces([]);
+      setWorkspaceLoadState("loaded");
+      return;
+    }
+
+    setWorkspaceLoadState("loading");
+
+    const result = await listMyWorkspaces();
+
+    if (!result.ok) {
+      setWorkspaces([]);
+      setWorkspaceLoadState("failed");
+      return;
+    }
+
+    setWorkspaces(result.data ?? []);
+    setWorkspaceLoadState("loaded");
+  }
+
+  async function loadProjects(workspaceId: string = activeWorkspaceId) {
     setProjectListState("loading");
 
+    const workspaceFilter =
+      workspaceId === PERSONAL_WORKSPACE_ID ? null : workspaceId;
+
     try {
-      const localProjects = readLocalProjectList();
-      const cloudProjects = await readCloudProjectList();
+      const localProjects = readLocalProjectList(workspaceFilter);
+      const cloudProjects = await readCloudProjectList(workspaceFilter);
       const mergedProjects = mergeProjectLists({
         localProjects,
         cloudProjects,
@@ -119,7 +157,7 @@ export default function DashboardPage() {
       writeLocalRecentProjects(mergedProjects);
       setProjectListState("loaded");
     } catch {
-      const localProjects = readLocalProjectList();
+      const localProjects = readLocalProjectList(workspaceFilter);
 
       setRecentProjects(localProjects);
       setProjectListState("failed");
@@ -127,8 +165,12 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
-    void loadProjects();
+    void loadWorkspaces();
   }, []);
+
+  useEffect(() => {
+    void loadProjects(activeWorkspaceId);
+  }, [activeWorkspaceId]);
 
   async function handleGenerate() {
     const input = prompt.trim();
@@ -160,14 +202,19 @@ export default function DashboardPage() {
       }
 
       const project = normalizeGeneratedProject(data);
+      const workspaceId = activeWorkspaceFilter;
 
-      await saveProjectRuntimeHybrid(project);
+      await saveProjectRuntimeHybrid(project, {
+        workspaceId,
+      });
 
       const newProjectItem: ProjectListItem = {
         projectId: project.projectId,
         input: project.input,
         createdAt: project.createdAt,
         source: "local",
+        workspaceId,
+        workspaceName: selectedWorkspace?.name,
       };
 
       const nextRecentProjects: ProjectListItem[] = [
@@ -204,17 +251,9 @@ export default function DashboardPage() {
     await deleteProjectRuntimeHybrid(projectId);
   }
 
-  const localCount = recentProjects.filter(
-    (project) => project.source === "local",
-  ).length;
-
-  const cloudCount = recentProjects.filter(
-    (project) => project.source === "cloud",
-  ).length;
-
-  const hybridCount = recentProjects.filter(
-    (project) => project.source === "hybrid",
-  ).length;
+  const localCount = recentProjects.filter((project) => project.source === "local").length;
+  const cloudCount = recentProjects.filter((project) => project.source === "cloud").length;
+  const hybridCount = recentProjects.filter((project) => project.source === "hybrid").length;
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(63,63,70,0.35),_transparent_35%),#09090b] px-4 py-5 text-white sm:px-6 lg:px-8">
@@ -233,7 +272,7 @@ export default function DashboardPage() {
 
                 <span className="inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-full border border-white/10 bg-black/20 px-4 text-xs font-medium text-zinc-300">
                   <LayoutDashboard className="h-3.5 w-3.5" />
-                  Runtime Alpha 0.9
+                  Runtime Alpha 1.1
                 </span>
 
                 <span
@@ -263,6 +302,49 @@ export default function DashboardPage() {
                 Transform one product idea into Project Brain, Enterprise PRD,
                 Architecture, Tasks, and Export Pack.
               </p>
+
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
+                  <Building2 className="h-4 w-4 text-zinc-500" />
+
+                  <select
+                    value={activeWorkspaceId}
+                    onChange={(event) => setActiveWorkspaceId(event.target.value)}
+                    className="min-w-[220px] bg-transparent text-sm font-medium text-white outline-none"
+                  >
+                    <option value={PERSONAL_WORKSPACE_ID}>
+                      Personal Projects
+                    </option>
+
+                    {workspaces.map((workspace) => (
+                      <option key={workspace.id} value={workspace.id}>
+                        {workspace.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => void loadWorkspaces()}
+                  disabled={workspaceLoadState === "loading"}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-white/10 px-4 text-sm font-medium text-zinc-300 transition hover:border-white/20 hover:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <RefreshCw
+                    className={`h-4 w-4 ${
+                      workspaceLoadState === "loading" ? "animate-spin" : ""
+                    }`}
+                  />
+                  Refresh Workspaces
+                </button>
+
+                <Link
+                  href="/workspace"
+                  className="inline-flex h-11 items-center justify-center rounded-2xl border border-white/10 px-4 text-sm font-medium text-zinc-300 transition hover:border-white/20 hover:bg-white/[0.05]"
+                >
+                  Manage Workspace
+                </Link>
+              </div>
             </div>
 
             <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
@@ -271,7 +353,7 @@ export default function DashboardPage() {
 
                 <button
                   type="button"
-                  onClick={() => void loadProjects()}
+                  onClick={() => void loadProjects(activeWorkspaceId)}
                   disabled={projectListState === "loading"}
                   className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:border-white/20 hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -326,7 +408,7 @@ export default function DashboardPage() {
 
               <p className="mt-2 text-sm leading-6 text-zinc-400">
                 Enter one product idea. DevCommander OS will generate a complete
-                runtime package.
+                runtime package under the selected project ownership scope.
               </p>
             </div>
 
@@ -345,14 +427,16 @@ export default function DashboardPage() {
 
             {projectListState === "failed" ? (
               <div className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-100">
-                Cloud projects could not be loaded. LocalStorage fallback is
-                still active.
+                Cloud projects could not be loaded. LocalStorage fallback is still active.
               </div>
             ) : null}
 
             <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-xs text-zinc-500">
-                Hybrid storage enabled: local-first, authenticated cloud-ready.
+                Current scope:{" "}
+                <span className="text-zinc-300">
+                  {selectedWorkspace?.name ?? "Personal Projects"}
+                </span>
               </p>
 
               <button
@@ -390,6 +474,7 @@ export default function DashboardPage() {
                 "Supabase Integration Base",
                 "Authentication Base",
                 "Cloud Project List",
+                "Workspace Project Ownership",
               ].map((item) => (
                 <div
                   key={item}
@@ -414,13 +499,17 @@ export default function DashboardPage() {
               </h2>
 
               <p className="mt-1 text-sm text-zinc-400">
-                Local and authenticated cloud projects are merged safely.
+                Showing projects under{" "}
+                <span className="text-zinc-300">
+                  {selectedWorkspace?.name ?? "Personal Projects"}
+                </span>
+                .
               </p>
             </div>
 
             <button
               type="button"
-              onClick={() => void loadProjects()}
+              onClick={() => void loadProjects(activeWorkspaceId)}
               disabled={projectListState === "loading"}
               className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:border-white/20 hover:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -440,7 +529,7 @@ export default function DashboardPage() {
               </p>
 
               <p className="mt-2 text-sm text-zinc-500">
-                Generate your first product runtime from the input panel above.
+                Generate your first project under this scope.
               </p>
             </div>
           ) : (
@@ -467,6 +556,10 @@ export default function DashboardPage() {
                           )}`}
                         >
                           {getSourceLabel(project.source)}
+                        </span>
+
+                        <span className="rounded-full bg-white/[0.06] px-3 py-1 text-xs text-zinc-400 ring-1 ring-white/10">
+                          {project.workspaceName ?? "Personal"}
                         </span>
 
                         <span className="font-mono text-xs text-zinc-600">

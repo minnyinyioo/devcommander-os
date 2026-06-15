@@ -256,6 +256,9 @@ async function upsertArtifact({
 
 export async function saveProjectToSupabase(
   project: ProjectRuntimeArtifact,
+  options?: {
+    workspaceId?: string | null;
+  },
 ): Promise<boolean> {
   const supabase = getSupabaseBrowserClient();
 
@@ -278,6 +281,7 @@ export async function saveProjectToSupabase(
       status: project.status ?? "generated",
       category: getProjectCategory(project),
       complexity: getProjectComplexity(project),
+      workspace_id: options?.workspaceId ?? null,
       created_at: project.createdAt ?? now,
       updated_at: project.updatedAt ?? now,
     },
@@ -330,11 +334,14 @@ export async function saveProjectToSupabase(
 
 export async function saveProjectRuntimeHybrid(
   project: ProjectRuntimeArtifact,
+  options?: {
+    workspaceId?: string | null;
+  },
 ): Promise<SaveRuntimeResult> {
   const localSaved = saveProjectToLocal(project);
 
   try {
-    const supabaseSaved = await saveProjectToSupabase(project);
+    const supabaseSaved = await saveProjectToSupabase(project, options);
 
     return {
       localSaved,
