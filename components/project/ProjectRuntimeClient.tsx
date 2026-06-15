@@ -11,6 +11,7 @@ import {
   RuntimeSection,
   sectionToText,
 } from "@/lib/project/project-runtime";
+import TaskBoard from "@/components/project/TaskBoard";
 
 type ProjectRuntimeClientProps = {
   projectId: string;
@@ -37,7 +38,7 @@ const tabs: Array<{ id: RuntimeTab; label: string; description: string }> = [
   {
     id: "tasks",
     label: "Tasks",
-    description: "Execution-ready engineering task breakdown.",
+    description: "Execution-ready engineering task board.",
   },
   {
     id: "export",
@@ -127,6 +128,7 @@ export default function ProjectRuntimeClient({ projectId }: ProjectRuntimeClient
 
   const markdown = useMemo(() => {
     if (!project) return "";
+
     return buildProjectMarkdown(project);
   }, [project]);
 
@@ -276,7 +278,7 @@ export default function ProjectRuntimeClient({ projectId }: ProjectRuntimeClient
             {activeTab === "architecture" ? (
               <SectionRenderer title="Architecture" section={project.architecture} />
             ) : null}
-            {activeTab === "tasks" ? <SectionRenderer title="Tasks" section={project.tasks} /> : null}
+            {activeTab === "tasks" ? <TaskBoard section={project.tasks} /> : null}
 
             {activeTab === "export" ? (
               <div className="rounded-2xl border border-white/10 bg-zinc-950/70 p-5 shadow-2xl shadow-black/20">
