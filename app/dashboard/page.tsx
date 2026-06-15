@@ -13,6 +13,7 @@ import {
   Rocket,
   Trash2,
 } from "lucide-react";
+import AuthMenu from "@/components/auth/AuthMenu";
 import {
   deleteProjectRuntimeHybrid,
   saveProjectRuntimeHybrid,
@@ -209,8 +210,10 @@ export default function DashboardPage() {
 
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-zinc-300">
                 <LayoutDashboard className="h-4 w-4" />
-                Runtime Alpha 0.7
+                Runtime Alpha 0.8
               </div>
+
+              <AuthMenu />
             </div>
 
             <h1 className="mt-6 max-w-4xl text-4xl font-semibold tracking-tight text-white sm:text-5xl">
@@ -239,7 +242,7 @@ export default function DashboardPage() {
 
               <div className="flex items-center gap-3">
                 <Rocket className="h-4 w-4 text-zinc-500" />
-                Auth-gated Cloud Save Next
+                Auth-gated Cloud Save Active
               </div>
             </div>
           </div>
@@ -313,6 +316,7 @@ export default function DashboardPage() {
                 "Architecture Generator V2",
                 "Task Board UI",
                 "Supabase Integration Base",
+                "Authentication Base",
               ].map((item) => (
                 <div
                   key={item}
@@ -337,7 +341,8 @@ export default function DashboardPage() {
               </h2>
 
               <p className="mt-1 text-sm text-zinc-400">
-                Local runtime remains active. Cloud persistence activates after Auth.
+                Local runtime remains active. Authenticated users can sync projects
+                to Supabase.
               </p>
             </div>
           </div>
