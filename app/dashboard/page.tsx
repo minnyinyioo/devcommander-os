@@ -1,5 +1,5 @@
 "use client";
-
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -8,7 +8,8 @@ import {
   FileText,
   LayoutDashboard,
   Loader2,
-  Rocket
+  Rocket,
+  Trash2
 } from "lucide-react";
 
 type RecentProject = {
@@ -70,8 +71,24 @@ export default function DashboardPage() {
     );
 
     setRecentProjects(nextRecent);
+    setPrompt("");
     setLoading(false);
     router.push(`/project/${data.projectId}`);
+  }
+
+  function deleteProject(projectId: string) {
+    localStorage.removeItem(`devcommander-project-${projectId}`);
+
+    const nextRecent = recentProjects.filter(
+      (project) => project.projectId !== projectId
+    );
+
+    localStorage.setItem(
+      "devcommander-recent-projects",
+      JSON.stringify(nextRecent)
+    );
+
+    setRecentProjects(nextRecent);
   }
 
   return (
@@ -93,10 +110,19 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-sm text-slate-400">Runtime Status</p>
-            <p className="mt-1 font-semibold text-cyan-400">ONLINE</p>
-          </div>
+          <div className="flex items-center gap-3">
+  <Link
+    href="/"
+    className="rounded-xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-300 transition hover:bg-white/10"
+  >
+    ← Home
+  </Link>
+
+  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+    <p className="text-sm text-slate-400">Runtime Status</p>
+    <p className="mt-1 font-semibold text-cyan-400">ONLINE</p>
+  </div>
+</div>
         </div>
 
         <section className="mt-10 rounded-3xl border border-white/10 bg-white/5 p-6">
@@ -157,18 +183,32 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-3">
                 {recentProjects.map((project) => (
-                  <button
+                  <div
                     key={project.projectId}
-                    onClick={() => router.push(`/project/${project.projectId}`)}
-                    className="w-full rounded-2xl border border-white/10 bg-slate-900 p-4 text-left transition hover:border-cyan-400/60"
+                    className="rounded-2xl border border-white/10 bg-slate-900 p-4 transition hover:border-cyan-400/60"
                   >
-                    <p className="line-clamp-2 text-sm font-medium text-white">
-                      {project.input}
-                    </p>
-                    <p className="mt-2 text-xs text-slate-500">
-                      {project.projectId.slice(0, 8)}
-                    </p>
-                  </button>
+                    <button
+                      onClick={() =>
+                        router.push(`/project/${project.projectId}`)
+                      }
+                      className="w-full text-left"
+                    >
+                      <p className="line-clamp-2 text-sm font-medium text-white">
+                        {project.input}
+                      </p>
+                      <p className="mt-2 text-xs text-slate-500">
+                        {project.projectId.slice(0, 8)}
+                      </p>
+                    </button>
+
+                    <button
+                      onClick={() => deleteProject(project.projectId)}
+                      className="mt-3 inline-flex items-center gap-2 text-xs text-red-400 hover:text-red-300"
+                    >
+                      <Trash2 size={14} />
+                      Delete
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
