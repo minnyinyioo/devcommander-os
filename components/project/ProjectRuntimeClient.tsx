@@ -11,6 +11,7 @@ import {
   RuntimeSection,
   sectionToText,
 } from "@/lib/project/project-runtime";
+import { loadProjectRuntimeHybrid } from "@/lib/project/storage-adapter";
 import TaskBoard from "@/components/project/TaskBoard";
 
 type ProjectRuntimeClientProps = {
@@ -123,8 +124,22 @@ export default function ProjectRuntimeClient({ projectId }: ProjectRuntimeClient
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
 
   useEffect(() => {
-    setProject(loadProjectRuntime(projectId));
-  }, [projectId]);
+  let mounted = true;
+
+  async function loadProject() {
+    const runtimeProject = await loadProjectRuntimeHybrid(projectId);
+
+    if (mounted) {
+      setProject(runtimeProject);
+    }
+  }
+
+  void loadProject();
+
+  return () => {
+    mounted = false;
+  };
+}, [projectId]);
 
   const markdown = useMemo(() => {
     if (!project) return "";
