@@ -6,10 +6,12 @@ import { useRouter } from "next/navigation";
 import {
   Brain,
   Clock3,
+  Cloud,
   FileText,
   Home,
   LayoutDashboard,
   Loader2,
+  RefreshCw,
   Rocket,
   Trash2,
 } from "lucide-react";
@@ -18,13 +20,14 @@ import {
   deleteProjectRuntimeHybrid,
   saveProjectRuntimeHybrid,
 } from "@/lib/project/storage-adapter";
+import {
+  mergeProjectLists,
+  ProjectListItem,
+  readCloudProjectList,
+  readLocalProjectList,
+  writeLocalRecentProjects,
+} from "@/lib/project/project-list-adapter";
 import type { RuntimeSection } from "@/lib/project/project-runtime";
-
-type RecentProject = {
-  projectId: string;
-  input: string;
-  createdAt?: string;
-};
 
 type GeneratedProject = {
   projectId: string;
@@ -39,7 +42,8 @@ type GeneratedProject = {
   exportPack?: RuntimeSection;
 };
 
-const RECENT_PROJECTS_KEY = "devcommander-recent-projects";
+type ProjectListLoadState = "idle" | "loading" | "loaded" | "failed";
+
 const MAX_RECENT_PROJECTS = 10;
 
 function formatDate(value?: string): string {
@@ -53,47 +57,6 @@ function formatDate(value?: string): string {
   } catch {
     return value;
   }
-}
-
-function isRecentProject(value: unknown): value is RecentProject {
-  if (typeof value !== "object" || value === null) return false;
-
-  const record = value as Record<string, unknown>;
-
-  return (
-    typeof record.projectId === "string" &&
-    record.projectId.trim().length > 0 &&
-    typeof record.input === "string" &&
-    record.input.trim().length > 0 &&
-    (record.createdAt === undefined || typeof record.createdAt === "string")
-  );
-}
-
-function readRecentProjects(): RecentProject[] {
-  if (typeof window === "undefined") return [];
-
-  const saved = window.localStorage.getItem(RECENT_PROJECTS_KEY);
-
-  if (!saved) return [];
-
-  try {
-    const parsed = JSON.parse(saved) as unknown;
-
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed.filter(isRecentProject).slice(0, MAX_RECENT_PROJECTS);
-  } catch {
-    return [];
-  }
-}
-
-function writeRecentProjects(projects: RecentProject[]): void {
-  if (typeof window === "undefined") return;
-
-  window.localStorage.setItem(
-    RECENT_PROJECTS_KEY,
-    JSON.stringify(projects.slice(0, MAX_RECENT_PROJECTS)),
-  );
 }
 
 function normalizeGeneratedProject(data: GeneratedProject): GeneratedProject {
@@ -111,16 +74,58 @@ function normalizeGeneratedProject(data: GeneratedProject): GeneratedProject {
   };
 }
 
+function getSourceBadgeClass(source: ProjectListItem["source"]): string {
+  if (source === "cloud") {
+    return "bg-sky-500/10 text-sky-300 ring-sky-400/20";
+  }
+
+  if (source === "hybrid") {
+    return "bg-emerald-500/10 text-emerald-300 ring-emerald-400/20";
+  }
+
+  return "bg-zinc-800 text-zinc-400 ring-white/10";
+}
+
+function getSourceLabel(source: ProjectListItem["source"]): string {
+  if (source === "cloud") return "Cloud";
+  if (source === "hybrid") return "Hybrid";
+  return "Local";
+}
+
 export default function DashboardPage() {
   const router = useRouter();
 
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
-  const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
+  const [recentProjects, setRecentProjects] = useState<ProjectListItem[]>([]);
+  const [projectListState, setProjectListState] =
+    useState<ProjectListLoadState>("idle");
   const [error, setError] = useState("");
 
+  async function loadProjects() {
+    setProjectListState("loading");
+
+    try {
+      const localProjects = readLocalProjectList();
+      const cloudProjects = await readCloudProjectList();
+      const mergedProjects = mergeProjectLists({
+        localProjects,
+        cloudProjects,
+      });
+
+      setRecentProjects(mergedProjects);
+      writeLocalRecentProjects(mergedProjects);
+      setProjectListState("loaded");
+    } catch {
+      const localProjects = readLocalProjectList();
+
+      setRecentProjects(localProjects);
+      setProjectListState("failed");
+    }
+  }
+
   useEffect(() => {
-    setRecentProjects(readRecentProjects());
+    void loadProjects();
   }, []);
 
   async function handleGenerate() {
@@ -156,19 +161,22 @@ export default function DashboardPage() {
 
       await saveProjectRuntimeHybrid(project);
 
-      const nextRecentProjects: RecentProject[] = [
-        {
-          projectId: project.projectId,
-          input: project.input,
-          createdAt: project.createdAt,
-        },
-        ...recentProjects.filter(
-          (recentProject) => recentProject.projectId !== project.projectId,
-        ),
-      ].slice(0, MAX_RECENT_PROJECTS);
+      const newProjectItem: ProjectListItem = {
+  projectId: project.projectId,
+  input: project.input,
+  createdAt: project.createdAt,
+  source: "local",
+};
+
+const nextRecentProjects: ProjectListItem[] = [
+  newProjectItem,
+  ...recentProjects.filter(
+    (recentProject) => recentProject.projectId !== project.projectId,
+  ),
+].slice(0, MAX_RECENT_PROJECTS);
 
       setRecentProjects(nextRecentProjects);
-      writeRecentProjects(nextRecentProjects);
+      writeLocalRecentProjects(nextRecentProjects);
 
       setPrompt("");
       router.push(`/project/${encodeURIComponent(project.projectId)}`);
@@ -189,10 +197,17 @@ export default function DashboardPage() {
     );
 
     setRecentProjects(nextProjects);
-    writeRecentProjects(nextProjects);
+    writeLocalRecentProjects(nextProjects);
 
     await deleteProjectRuntimeHybrid(projectId);
   }
+
+  const localCount = recentProjects.filter((project) => project.source === "local")
+    .length;
+  const cloudCount = recentProjects.filter((project) => project.source === "cloud")
+    .length;
+  const hybridCount = recentProjects.filter((project) => project.source === "hybrid")
+    .length;
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(63,63,70,0.35),_transparent_35%),#09090b] px-4 py-6 text-white sm:px-6 lg:px-8">
@@ -210,7 +225,7 @@ export default function DashboardPage() {
 
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-zinc-300">
                 <LayoutDashboard className="h-4 w-4" />
-                Runtime Alpha 0.8
+                Runtime Alpha 0.9
               </div>
 
               <AuthMenu />
@@ -226,23 +241,48 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 lg:w-[320px]">
-            <p className="text-sm text-zinc-400">Storage Mode</p>
+          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 lg:w-[340px]">
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-sm text-zinc-400">Storage Mode</p>
+
+              <button
+                type="button"
+                onClick={() => void loadProjects()}
+                disabled={projectListState === "loading"}
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:border-white/20 hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <RefreshCw
+                  className={`h-3.5 w-3.5 ${
+                    projectListState === "loading" ? "animate-spin" : ""
+                  }`}
+                />
+                Refresh
+              </button>
+            </div>
 
             <div className="mt-4 grid gap-3 text-sm text-zinc-300">
-              <div className="flex items-center gap-3">
-                <Brain className="h-4 w-4 text-zinc-500" />
-                LocalStorage Fallback
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+                <span className="flex items-center gap-3">
+                  <Brain className="h-4 w-4 text-zinc-500" />
+                  Local
+                </span>
+                <span className="text-zinc-400">{localCount}</span>
               </div>
 
-              <div className="flex items-center gap-3">
-                <FileText className="h-4 w-4 text-zinc-500" />
-                Supabase-ready Schema
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+                <span className="flex items-center gap-3">
+                  <Cloud className="h-4 w-4 text-zinc-500" />
+                  Cloud
+                </span>
+                <span className="text-zinc-400">{cloudCount}</span>
               </div>
 
-              <div className="flex items-center gap-3">
-                <Rocket className="h-4 w-4 text-zinc-500" />
-                Auth-gated Cloud Save Active
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+                <span className="flex items-center gap-3">
+                  <FileText className="h-4 w-4 text-zinc-500" />
+                  Hybrid
+                </span>
+                <span className="text-zinc-400">{hybridCount}</span>
               </div>
             </div>
           </div>
@@ -278,9 +318,16 @@ export default function DashboardPage() {
               </div>
             ) : null}
 
+            {projectListState === "failed" ? (
+              <div className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-100">
+                Cloud projects could not be loaded. LocalStorage fallback is still
+                active.
+              </div>
+            ) : null}
+
             <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-xs text-zinc-500">
-                Hybrid storage enabled: local-first, Supabase-ready.
+                Hybrid storage enabled: local-first, authenticated cloud-ready.
               </p>
 
               <button
@@ -317,6 +364,7 @@ export default function DashboardPage() {
                 "Task Board UI",
                 "Supabase Integration Base",
                 "Authentication Base",
+                "Cloud Project List",
               ].map((item) => (
                 <div
                   key={item}
@@ -334,17 +382,30 @@ export default function DashboardPage() {
         </section>
 
         <section className="pb-10">
-          <div className="mb-5 flex items-center justify-between gap-4">
+          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-2xl font-semibold text-white">
                 Recent Projects
               </h2>
 
               <p className="mt-1 text-sm text-zinc-400">
-                Local runtime remains active. Authenticated users can sync projects
-                to Supabase.
+                Local and authenticated cloud projects are merged safely.
               </p>
             </div>
+
+            <button
+              type="button"
+              onClick={() => void loadProjects()}
+              disabled={projectListState === "loading"}
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:border-white/20 hover:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${
+                  projectListState === "loading" ? "animate-spin" : ""
+                }`}
+              />
+              Refresh Projects
+            </button>
           </div>
 
           {recentProjects.length === 0 ? (
@@ -374,7 +435,21 @@ export default function DashboardPage() {
                       }
                       className="min-w-0 text-left"
                     >
-                      <p className="line-clamp-2 text-base font-semibold leading-7 text-white">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${getSourceBadgeClass(
+                            project.source,
+                          )}`}
+                        >
+                          {getSourceLabel(project.source)}
+                        </span>
+
+                        <span className="font-mono text-xs text-zinc-600">
+                          {project.projectId}
+                        </span>
+                      </div>
+
+                      <p className="mt-3 line-clamp-2 text-base font-semibold leading-7 text-white">
                         {project.input}
                       </p>
 
@@ -383,8 +458,6 @@ export default function DashboardPage() {
                           <Clock3 className="h-3.5 w-3.5" />
                           {formatDate(project.createdAt)}
                         </span>
-
-                        <span className="font-mono">{project.projectId}</span>
                       </div>
                     </button>
 
