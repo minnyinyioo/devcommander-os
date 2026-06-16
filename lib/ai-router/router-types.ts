@@ -11,6 +11,8 @@ export type AiTaskType =
 
 export type AiRouterMode = "local_first" | "cloud_ready" | "enterprise";
 
+export type AiRouteRunStatus = "completed" | "blocked" | "failed";
+
 export type AiRouterProvider = {
   id: AiProviderId;
   name: string;
@@ -27,6 +29,22 @@ export type AiRoutingRule = {
   primaryProvider: AiProviderId;
   fallbackProviders: AiProviderId[];
   reason: string;
+};
+
+export type AiRouteRunResult = {
+  id: string;
+  projectId: string;
+  taskType: AiTaskType;
+  taskLabel: string;
+  selectedProvider: AiProviderId;
+  fallbackChain: AiProviderId[];
+  status: AiRouteRunStatus;
+  outputTitle: string;
+  outputSummary: string;
+  outputMarkdown: string;
+  safetyNotes: string[];
+  startedAt: string;
+  completedAt: string;
 };
 
 export type AiRouterPlan = {

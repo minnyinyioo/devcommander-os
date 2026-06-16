@@ -11,16 +11,57 @@ import {
   Copy,
   KeyRound,
   Loader2,
+  Play,
   RefreshCw,
   Route,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
+import { createAuditEventSilently } from "@/lib/audit/audit-adapter";
 import { generateAiRouterPlan } from "@/lib/ai-router/router-engine";
-import type { AiProviderStatus, AiRouterPlan } from "@/lib/ai-router/router-types";
+import { runAiRouterTask } from "@/lib/ai-router/router-runner";
+import type {
+  AiProviderStatus,
+  AiRouteRunResult,
+  AiRouterPlan,
+  AiTaskType,
+} from "@/lib/ai-router/router-types";
 import { loadProjectRuntimeHybrid } from "@/lib/project/storage-adapter";
+import type { ProjectRuntimeArtifact } from "@/lib/project/project-runtime";
 
 type LoadState = "idle" | "loading" | "loaded" | "failed";
+
+const TASK_OPTIONS: Array<{
+  value: AiTaskType;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "product",
+    label: "Product",
+    description: "Review PRD, users, MVP scope, and success criteria.",
+  },
+  {
+    value: "architecture",
+    label: "Architecture",
+    description: "Review system design, database, auth, API, and security.",
+  },
+  {
+    value: "code",
+    label: "Code",
+    description: "Review Code Pack generation readiness and file output rules.",
+  },
+  {
+    value: "deployment",
+    label: "Deployment",
+    description: "Review deployment, environment variables, and rollback.",
+  },
+  {
+    value: "monitoring",
+    label: "Monitoring",
+    description: "Review audit events, runtime logs, and operations coverage.",
+  },
+];
 
 function formatDate(value: string): string {
   try {
@@ -49,8 +90,12 @@ export default function ProjectAiRouterClient() {
   const params = useParams<{ id: string }>();
   const projectId = params.id;
 
+  const [project, setProject] = useState<ProjectRuntimeArtifact | null>(null);
   const [plan, setPlan] = useState<AiRouterPlan | null>(null);
+  const [selectedTask, setSelectedTask] = useState<AiTaskType>("product");
+  const [runResult, setRunResult] = useState<AiRouteRunResult | null>(null);
   const [loadState, setLoadState] = useState<LoadState>("idle");
+  const [running, setRunning] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState("");
 
@@ -60,13 +105,16 @@ export default function ProjectAiRouterClient() {
     setCopied("");
 
     try {
-      const project = await loadProjectRuntimeHybrid(projectId);
-      const nextPlan = generateAiRouterPlan(project);
+      const runtimeProject = await loadProjectRuntimeHybrid(projectId);
+      const nextPlan = generateAiRouterPlan(runtimeProject);
 
+      setProject(runtimeProject);
       setPlan(nextPlan);
       setLoadState("loaded");
     } catch (currentError) {
+      setProject(null);
       setPlan(null);
+      setRunResult(null);
       setError(
         currentError instanceof Error
           ? currentError.message
@@ -90,6 +138,57 @@ export default function ProjectAiRouterClient() {
       }, 1400);
     } catch {
       setCopied("Copy failed");
+    }
+  }
+
+  async function handleRunTask() {
+    if (!project || !plan || running) return;
+
+    setRunning(true);
+    setError("");
+
+    try {
+      const result = runAiRouterTask({
+        project,
+        plan,
+        taskType: selectedTask,
+      });
+
+      setRunResult(result);
+
+      await createAuditEventSilently({
+        eventType: "ai.route.executed",
+        entityType: "runtime",
+        entityId: result.id,
+        projectId,
+        message: `AI route executed: ${result.taskLabel}`,
+        metadata: {
+          source: "ai_router_task_runner",
+          taskType: result.taskType,
+          selectedProvider: result.selectedProvider,
+          fallbackChain: result.fallbackChain,
+          status: result.status,
+        },
+      });
+    } catch (currentError) {
+      setError(
+        currentError instanceof Error
+          ? currentError.message
+          : "AI route execution failed.",
+      );
+
+      await createAuditEventSilently({
+        eventType: "ai.route.failed",
+        entityType: "runtime",
+        projectId,
+        message: "AI route execution failed.",
+        metadata: {
+          source: "ai_router_task_runner",
+          taskType: selectedTask,
+        },
+      });
+    } finally {
+      setRunning(false);
     }
   }
 
@@ -131,29 +230,29 @@ export default function ProjectAiRouterClient() {
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.32em] text-zinc-500">
-                AI Router Foundation
+                AI Router Task Runner
               </p>
 
               <h1 className="mt-4 max-w-4xl text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-                Project AI Routing Console
+                Local-First AI Routing Console
               </h1>
 
               <p className="mt-5 max-w-3xl text-base leading-8 text-zinc-400">
-                Route PRD, architecture, code, deployment, and monitoring tasks
-                across local and future cloud AI providers with fallback and
-                secret-safe policies.
+                Execute product, architecture, code, deployment, and monitoring
+                tasks through the local runtime router. Cloud providers remain
+                disabled until server-side key handling is added.
               </p>
             </div>
 
             <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-5 lg:w-[340px]">
               <div className="flex items-center gap-2 text-emerald-200">
                 <ShieldCheck className="h-4 w-4" />
-                <p className="text-sm font-semibold">Secret-Safe Router</p>
+                <p className="text-sm font-semibold">No Provider Key Required</p>
               </div>
 
               <p className="mt-3 text-sm leading-6 text-emerald-100/80">
-                This foundation does not expose or require provider keys. Cloud
-                AI execution should be added only through server-side routes.
+                This runner uses the Local Runtime Engine. No OpenAI,
+                Anthropic, or Gemini API key is exposed or required.
               </p>
             </div>
           </div>
@@ -214,24 +313,127 @@ export default function ProjectAiRouterClient() {
 
               <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
                 <div className="mb-5 flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-zinc-500" />
+                  <Play className="h-4 w-4 text-zinc-500" />
                   <h2 className="text-xl font-semibold text-white">
-                    Next Actions
+                    Run Local Route
                   </h2>
                 </div>
 
-                <div className="grid gap-3">
-                  {plan.nextActions.map((action) => (
-                    <div
-                      key={action}
-                      className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm leading-6 text-zinc-300"
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                  {TASK_OPTIONS.map((task) => (
+                    <button
+                      key={task.value}
+                      type="button"
+                      onClick={() => setSelectedTask(task.value)}
+                      className={`rounded-2xl border p-4 text-left transition ${
+                        selectedTask === task.value
+                          ? "border-white/30 bg-white text-zinc-950"
+                          : "border-white/10 bg-black/20 hover:border-white/20 hover:bg-white/[0.05]"
+                      }`}
                     >
-                      {action}
+                      <p className="text-sm font-semibold">{task.label}</p>
+
+                      <p
+                        className={`mt-2 text-xs leading-5 ${
+                          selectedTask === task.value
+                            ? "text-zinc-700"
+                            : "text-zinc-500"
+                        }`}
+                      >
+                        {task.description}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => void handleRunTask()}
+                  disabled={running}
+                  className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {running ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Running Route
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4" />
+                      Run Selected Route
+                    </>
+                  )}
+                </button>
+              </div>
+            </section>
+
+            {runResult ? (
+              <section className="mt-6 rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300 ring-1 ring-emerald-400/20">
+                        {runResult.status}
+                      </span>
+
+                      <span className="rounded-full bg-white/[0.06] px-3 py-1 text-xs text-zinc-400 ring-1 ring-white/10">
+                        provider: {runResult.selectedProvider}
+                      </span>
+
+                      <span className="rounded-full bg-white/[0.06] px-3 py-1 text-xs text-zinc-400 ring-1 ring-white/10">
+                        {runResult.taskLabel}
+                      </span>
+                    </div>
+
+                    <h2 className="mt-4 text-xl font-semibold text-white">
+                      {runResult.outputTitle}
+                    </h2>
+
+                    <p className="mt-2 text-sm leading-6 text-zinc-400">
+                      {runResult.outputSummary}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void copyToClipboard(
+                        runResult.outputMarkdown,
+                        runResult.id,
+                      )
+                    }
+                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-zinc-200"
+                  >
+                    {copied === runResult.id ? (
+                      <>
+                        <Check className="h-4 w-4" />
+                        Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-4 w-4" />
+                        Copy Result
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <pre className="max-h-[520px] overflow-auto rounded-2xl border border-white/10 bg-black/40 p-5 text-sm leading-7 text-zinc-200">
+                  <code>{runResult.outputMarkdown}</code>
+                </pre>
+
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  {runResult.safetyNotes.map((note) => (
+                    <div
+                      key={note}
+                      className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm leading-6 text-emerald-100"
+                    >
+                      {note}
                     </div>
                   ))}
                 </div>
-              </div>
-            </section>
+              </section>
+            ) : null}
 
             <section className="mt-6 rounded-3xl border border-white/10 bg-white/[0.03] p-6">
               <div className="mb-5 flex items-center gap-2">

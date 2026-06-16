@@ -8,7 +8,10 @@ export type AuditEventType =
   | "auth.login"
   | "auth.logout"
   | "runtime.warning"
-  | "runtime.error";
+  | "runtime.error"
+  | "ai.route.selected"
+  | "ai.route.executed"
+  | "ai.route.failed";
 
 export type AuditEntityType =
   | "project"
