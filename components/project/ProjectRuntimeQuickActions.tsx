@@ -1,5 +1,13 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
-import { Activity, Code2, Gauge, LayoutDashboard, Layers3 } from "lucide-react";
+import {
+  Activity,
+  Code2,
+  Gauge,
+  LayoutDashboard,
+  Layers3,
+  Rocket,
+} from "lucide-react";
 
 type ProjectRuntimeQuickActionsProps = {
   projectId: string;
@@ -15,7 +23,7 @@ function NavLink({
   variant = "ghost",
 }: {
   href: string;
-  children: React.ReactNode;
+  children: ReactNode;
   variant?: "ghost" | "solid";
 }) {
   return (
@@ -54,6 +62,11 @@ export default function ProjectRuntimeQuickActions({
         <NavLink href={getProjectHref(projectId, "/code")} variant="solid">
           <Code2 className="h-4 w-4" />
           Code Pack
+        </NavLink>
+
+        <NavLink href={getProjectHref(projectId, "/deploy")}>
+          <Rocket className="h-4 w-4" />
+          Deploy
         </NavLink>
 
         <NavLink href={getProjectHref(projectId, "/readiness")}>
