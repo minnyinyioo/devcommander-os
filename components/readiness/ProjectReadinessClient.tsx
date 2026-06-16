@@ -132,8 +132,8 @@ function ReadinessItemCard({ item }: { item: ReadinessItem }) {
 }
 
 export default function ProjectReadinessClient() {
-  const params = useParams<{ projectId: string }>();
-  const projectId = params.projectId;
+  const params = useParams<{ id: string }>();
+  const projectId = params.id;
 
   const [project, setProject] = useState<ProjectRuntimeArtifact | null>(null);
   const [report, setReport] = useState<ReadinessReport | null>(null);
