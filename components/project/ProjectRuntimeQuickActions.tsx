@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   Layers3,
   Rocket,
+  Wrench,
 } from "lucide-react";
 
 export type ProjectRuntimeModule =
@@ -20,6 +21,7 @@ export type ProjectRuntimeModule =
   | "readiness"
   | "deploy"
   | "monitor"
+  | "ops"
   | "activity";
 
 type ProjectRuntimeQuickActionsProps = {
@@ -123,6 +125,14 @@ export default function ProjectRuntimeQuickActions({
         >
           <Activity className="h-4 w-4" />
           Monitor
+        </NavLink>
+
+        <NavLink
+          href={getProjectHref(projectId, "/ops")}
+          active={activeModule === "ops"}
+        >
+          <Wrench className="h-4 w-4" />
+          Ops
         </NavLink>
 
         <NavLink href="/activity" active={activeModule === "activity"}>
