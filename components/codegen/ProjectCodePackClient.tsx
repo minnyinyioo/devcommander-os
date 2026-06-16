@@ -8,6 +8,7 @@ import {
   Check,
   Code2,
   Copy,
+  Download,
   FileCode2,
   FolderTree,
   Loader2,
@@ -15,7 +16,9 @@ import {
   Rocket,
   ShieldCheck,
 } from "lucide-react";
+import { createAuditEventSilently } from "@/lib/audit/audit-adapter";
 import { generateCodePack } from "@/lib/codegen/codegen-engine";
+import { downloadCodePackZip } from "@/lib/codegen/codepack-zip";
 import type { CodePack, CodePackFile } from "@/lib/codegen/codegen-types";
 import { loadProjectRuntimeHybrid } from "@/lib/project/storage-adapter";
 import type { ProjectRuntimeArtifact } from "@/lib/project/project-runtime";
@@ -76,6 +79,7 @@ export default function ProjectCodePackClient() {
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [error, setError] = useState("");
   const [copied, setCopied] = useState("");
+  const [exportingZip, setExportingZip] = useState(false);
 
   const loadCodePack = useCallback(async () => {
     setLoadState("loading");
@@ -130,6 +134,41 @@ export default function ProjectCodePackClient() {
     }
   }
 
+  async function handleExportZip() {
+    if (!codePack) return;
+
+    setExportingZip(true);
+    setCopied("");
+
+    try {
+      await downloadCodePackZip(codePack);
+
+      await createAuditEventSilently({
+        eventType: "project.exported",
+        entityType: "project",
+        entityId: projectId,
+        projectId,
+        message: `Exported code pack: ${codePack.title}`,
+        metadata: {
+          source: "code_pack_export_zip",
+          fileCount: codePack.fileCount,
+          generatedAt: codePack.generatedAt,
+        },
+      });
+
+      setCopied("ZIP exported");
+
+      window.setTimeout(() => {
+        setCopied("");
+      }, 1600);
+    } catch (currentError) {
+      console.error("ZIP export failed.", currentError);
+      setCopied("Export failed");
+    } finally {
+      setExportingZip(false);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(63,63,70,0.35),_transparent_35%),#09090b] px-4 py-8 text-white sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
@@ -170,8 +209,8 @@ export default function ProjectCodePackClient() {
 
               <p className="mt-5 max-w-3xl text-base leading-8 text-zinc-400">
                 Convert the Project Runtime into a starter file tree with
-                Next.js, TypeScript, Tailwind, Supabase schema, README, and
-                smoke test instructions.
+                Next.js, TypeScript, Tailwind, Supabase schema, README, smoke
+                tests, and downloadable ZIP export.
               </p>
             </div>
 
@@ -199,6 +238,18 @@ export default function ProjectCodePackClient() {
         {error ? (
           <section className="mt-6 rounded-3xl border border-red-500/20 bg-red-500/10 p-6 text-sm leading-7 text-red-200">
             {error}
+          </section>
+        ) : null}
+
+        {copied === "Export failed" ? (
+          <section className="mt-6 rounded-3xl border border-red-500/20 bg-red-500/10 p-5 text-sm text-red-200">
+            ZIP export failed. Try refreshing the code pack and exporting again.
+          </section>
+        ) : null}
+
+        {copied === "ZIP exported" ? (
+          <section className="mt-6 rounded-3xl border border-emerald-500/20 bg-emerald-500/10 p-5 text-sm text-emerald-100">
+            ZIP exported successfully.
           </section>
         ) : null}
 
@@ -242,6 +293,25 @@ export default function ProjectCodePackClient() {
                 <p className="mt-5 text-xs text-zinc-600">
                   Generated: {formatDate(codePack.generatedAt)}
                 </p>
+
+                <button
+                  type="button"
+                  onClick={() => void handleExportZip()}
+                  disabled={exportingZip}
+                  className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {exportingZip ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Exporting ZIP
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4" />
+                      Export ZIP
+                    </>
+                  )}
+                </button>
 
                 <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-4">
                   <div className="flex items-center gap-2 text-zinc-300">
