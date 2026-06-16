@@ -111,6 +111,20 @@ export async function createAuditEvent(
   };
 }
 
+export async function createAuditEventSilently(
+  input: CreateAuditEventInput,
+): Promise<void> {
+  try {
+    const result = await createAuditEvent(input);
+
+    if (!result.ok) {
+      console.warn("Audit event was not recorded:", result.error);
+    }
+  } catch (error) {
+    console.warn("Audit event failed silently:", error);
+  }
+}
+
 export async function listMyAuditEvents(options?: {
   workspaceId?: string | null;
   projectId?: string | null;

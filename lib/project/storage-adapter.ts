@@ -1,3 +1,4 @@
+import { createAuditEventSilently } from "@/lib/audit/audit-adapter";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { isBrowser, loadProjectRuntime } from "@/lib/project/project-runtime";
 import type {
@@ -32,6 +33,7 @@ type StandardArtifactTable = Exclude<ArtifactTable, "export_packs">;
 
 const LOCAL_PROJECT_PREFIX = "devcommander-project";
 const LOCAL_PROJECT_OS_PREFIX = "devcommander-os-project";
+const OPENED_AUDIT_SESSION_PREFIX = "devcommander-audit-opened";
 
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -43,6 +45,17 @@ function readString(record: UnknownRecord | undefined, key: string): string | un
   const value = record[key];
 
   return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function readNullableString(
+  record: UnknownRecord | undefined,
+  key: string,
+): string | null {
+  if (!record) return null;
+
+  const value = record[key];
+
+  return typeof value === "string" && value.trim() ? value : null;
 }
 
 function asRuntimeSection(value: unknown): RuntimeSection {
@@ -109,6 +122,37 @@ function getExportMarkdown(project: ProjectRuntimeArtifact): string | null {
   const markdown = project.exportPack.markdown;
 
   return typeof markdown === "string" ? markdown : null;
+}
+
+function shouldAuditProjectOpened(projectId: string): boolean {
+  if (!isBrowser()) return false;
+
+  const key = `${OPENED_AUDIT_SESSION_PREFIX}-${projectId}`;
+
+  if (window.sessionStorage.getItem(key)) {
+    return false;
+  }
+
+  window.sessionStorage.setItem(key, "true");
+
+  return true;
+}
+
+async function auditProjectOpenedOnce(project: ProjectRuntimeArtifact): Promise<void> {
+  if (project.status === "missing") return;
+  if (!shouldAuditProjectOpened(project.projectId)) return;
+
+  await createAuditEventSilently({
+    eventType: "project.opened",
+    entityType: "project",
+    entityId: project.projectId,
+    projectId: project.projectId,
+    message: `Opened project runtime: ${getProjectTitle(project)}`,
+    metadata: {
+      source: "project_runtime",
+      projectId: project.projectId,
+    },
+  });
 }
 
 export function saveProjectToLocal(project: ProjectRuntimeArtifact): boolean {
@@ -272,6 +316,14 @@ export async function saveProjectToSupabase(
 
   const now = new Date().toISOString();
 
+  const { data: existingProject } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("id", project.projectId)
+    .maybeSingle();
+
+  const isNewProject = !existingProject;
+
   const { error: projectError } = await supabase.from("projects").upsert(
     {
       id: project.projectId,
@@ -328,6 +380,22 @@ export async function saveProjectToSupabase(
     userId: user.id,
     content: asRuntimeSection(project.exportPack),
   });
+
+  if (isNewProject) {
+    await createAuditEventSilently({
+      eventType: "project.created",
+      entityType: "project",
+      entityId: project.projectId,
+      projectId: project.projectId,
+      workspaceId: options?.workspaceId ?? null,
+      message: `Created project runtime: ${getProjectTitle(project)}`,
+      metadata: {
+        source: "save_project_to_supabase",
+        projectId: project.projectId,
+        workspaceId: options?.workspaceId ?? null,
+      },
+    });
+  }
 
   return true;
 }
@@ -431,12 +499,19 @@ export async function loadProjectRuntimeHybrid(
   try {
     const supabaseProject = await loadProjectFromSupabase(projectId);
 
-    if (supabaseProject) return supabaseProject;
+    if (supabaseProject) {
+      await auditProjectOpenedOnce(supabaseProject);
+      return supabaseProject;
+    }
   } catch (error) {
     console.error("Supabase load failed. Falling back to LocalStorage.", error);
   }
 
-  return loadProjectRuntime(projectId);
+  const localProject = loadProjectRuntime(projectId);
+
+  await auditProjectOpenedOnce(localProject);
+
+  return localProject;
 }
 
 export async function deleteProjectFromSupabase(projectId: string): Promise<boolean> {
@@ -449,6 +524,31 @@ export async function deleteProjectFromSupabase(projectId: string): Promise<bool
   } = await supabase.auth.getUser();
 
   if (!user) return false;
+
+  const { data: projectBeforeDelete } = await supabase
+    .from("projects")
+    .select("id,input,workspace_id")
+    .eq("id", projectId)
+    .maybeSingle();
+
+  const projectRecord = isRecord(projectBeforeDelete)
+    ? projectBeforeDelete
+    : undefined;
+
+  await createAuditEventSilently({
+    eventType: "project.deleted",
+    entityType: "project",
+    entityId: projectId,
+    projectId,
+    workspaceId: readNullableString(projectRecord, "workspace_id"),
+    message: `Deleted project runtime: ${
+      readString(projectRecord, "input")?.slice(0, 80) ?? projectId
+    }`,
+    metadata: {
+      source: "delete_project_from_supabase",
+      projectId,
+    },
+  });
 
   const { error } = await supabase.from("projects").delete().eq("id", projectId);
 

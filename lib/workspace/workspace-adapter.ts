@@ -1,5 +1,6 @@
 "use client";
 
+import { createAuditEventSilently } from "@/lib/audit/audit-adapter";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import type {
   WorkspaceActionResult,
@@ -150,9 +151,25 @@ export async function createWorkspace(
     };
   }
 
+  const workspace = mapWorkspaceRow(firstRow);
+
+  await createAuditEventSilently({
+    eventType: "workspace.created",
+    entityType: "workspace",
+    entityId: workspace.id,
+    workspaceId: workspace.id,
+    message: `Created workspace: ${workspace.name}`,
+    metadata: {
+      source: "create_workspace",
+      workspaceId: workspace.id,
+      slug: workspace.slug,
+      role: workspace.role,
+    },
+  });
+
   return {
     ok: true,
-    data: mapWorkspaceRow(firstRow),
+    data: workspace,
   };
 }
 
