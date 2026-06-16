@@ -5,6 +5,7 @@ import {
   Bot,
   Clock3,
   Code2,
+  FileText,
   FlaskConical,
   Gauge,
   LayoutDashboard,
@@ -22,6 +23,7 @@ export type ProjectRuntimeModule =
   | "deploy"
   | "monitor"
   | "ops"
+  | "handover"
   | "activity";
 
 type ProjectRuntimeQuickActionsProps = {
@@ -133,6 +135,14 @@ export default function ProjectRuntimeQuickActions({
         >
           <Wrench className="h-4 w-4" />
           Ops
+        </NavLink>
+
+        <NavLink
+          href={getProjectHref(projectId, "/handover")}
+          active={activeModule === "handover"}
+        >
+          <FileText className="h-4 w-4" />
+          Handover
         </NavLink>
 
         <NavLink href="/activity" active={activeModule === "activity"}>
