@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import {
   Activity,
+  Bot,
   Code2,
   Gauge,
   LayoutDashboard,
@@ -59,7 +60,12 @@ export default function ProjectRuntimeQuickActions({
           Project
         </NavLink>
 
-        <NavLink href={getProjectHref(projectId, "/code")} variant="solid">
+        <NavLink href={getProjectHref(projectId, "/router")} variant="solid">
+          <Bot className="h-4 w-4" />
+          AI Router
+        </NavLink>
+
+        <NavLink href={getProjectHref(projectId, "/code")}>
           <Code2 className="h-4 w-4" />
           Code Pack
         </NavLink>
