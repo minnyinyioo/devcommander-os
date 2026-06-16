@@ -14,7 +14,10 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
 
   return (
     <>
-      <ProjectRuntimeQuickActions projectId={projectId} />
+      <ProjectRuntimeQuickActions
+        projectId={projectId}
+        activeModule="project"
+      />
       <ProjectRuntimeActionHub projectId={projectId} />
       <ProjectRuntimeClient projectId={projectId} />
     </>

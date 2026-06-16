@@ -1,5 +1,25 @@
 import ProjectDeployClient from "@/components/deploy/ProjectDeployClient";
+import ProjectRuntimeQuickActions from "@/components/project/ProjectRuntimeQuickActions";
 
-export default function ProjectDeployPage() {
-  return <ProjectDeployClient />;
+type ProjectDeployPageProps = {
+  params: Promise<{
+    id: string;
+  }>;
+};
+
+export default async function ProjectDeployPage({
+  params,
+}: ProjectDeployPageProps) {
+  const { id } = await params;
+  const projectId = decodeURIComponent(id);
+
+  return (
+    <>
+      <ProjectRuntimeQuickActions
+        projectId={projectId}
+        activeModule="deploy"
+      />
+      <ProjectDeployClient />
+    </>
+  );
 }
