@@ -14,6 +14,8 @@ import {
   Loader2,
   RefreshCw,
   Rocket,
+  Bot,
+  FlaskConical,
 } from "lucide-react";
 import { generateCodePack } from "@/lib/codegen/codegen-engine";
 import type { CodePack } from "@/lib/codegen/codegen-types";
@@ -357,40 +359,56 @@ export default function ProjectRuntimeActionHub({
                 </div>
               </div>
 
-              <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <ActionCard
-                  href={getProjectHref(projectId, "/code")}
-                  title="Code Pack"
-                  description="Preview generated files and download the ZIP package."
-                  meta={`${codePack.fileCount} generated files`}
-                  icon={<Code2 className="h-5 w-5" />}
-                  primary
-                />
+              <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+  <ActionCard
+    href={getProjectHref(projectId, "/router")}
+    title="AI Router"
+    description="Run local AI routing tasks for product, architecture, code, deployment, and monitoring."
+    meta="Local-first router"
+    icon={<Bot className="h-5 w-5" />}
+  />
 
-                <ActionCard
-                  href={getProjectHref(projectId, "/deploy")}
-                  title="Deploy Pack"
-                  description="Review build commands, env vars, production checklist, and rollback plan."
-                  meta={`${deploymentPack.riskLevel} deployment risk`}
-                  icon={<Rocket className="h-5 w-5" />}
-                />
+  <ActionCard
+    href={getProjectHref(projectId, "/code")}
+    title="Code Pack"
+    description="Preview generated files and download the ZIP package."
+    meta={`${codePack.fileCount} generated files`}
+    icon={<Code2 className="h-5 w-5" />}
+    primary
+  />
 
-                <ActionCard
-                  href={getProjectHref(projectId, "/readiness")}
-                  title="Readiness Gate"
-                  description="Check product, architecture, security, delivery, and operations score."
-                  meta={`${readinessReport.overallScore}/100 readiness`}
-                  icon={<Gauge className="h-5 w-5" />}
-                />
+  <ActionCard
+    href={getProjectHref(projectId, "/tests")}
+    title="Tests"
+    description="Review smoke, route, security, data, deployment, and acceptance checks."
+    meta="QA before deploy"
+    icon={<FlaskConical className="h-5 w-5" />}
+  />
 
-                <ActionCard
-                  href="/activity"
-                  title="Activity Audit"
-                  description="View project events, exports, workspace activity, and runtime audit trail."
-                  meta="Runtime monitoring"
-                  icon={<Activity className="h-5 w-5" />}
-                />
-              </div>
+  <ActionCard
+    href={getProjectHref(projectId, "/readiness")}
+    title="Readiness Gate"
+    description="Check product, architecture, security, delivery, and operations score."
+    meta={`${readinessReport.overallScore}/100 readiness`}
+    icon={<Gauge className="h-5 w-5" />}
+  />
+
+  <ActionCard
+    href={getProjectHref(projectId, "/deploy")}
+    title="Deploy Pack"
+    description="Review build commands, env vars, production checklist, rollback plan, and deployment events."
+    meta={`${deploymentPack.riskLevel} deployment risk`}
+    icon={<Rocket className="h-5 w-5" />}
+  />
+
+  <ActionCard
+    href={getProjectHref(projectId, "/monitor")}
+    title="Monitor"
+    description="Review runtime health, incidents, operational signals, and launch readiness."
+    meta="Runtime operations"
+    icon={<Activity className="h-5 w-5" />}
+  />
+</div>
             </>
           ) : null}
 

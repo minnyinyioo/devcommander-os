@@ -3,6 +3,7 @@ import Link from "next/link";
 import {
   Activity,
   Bot,
+  Clock3,
   Code2,
   FlaskConical,
   Gauge,
@@ -18,6 +19,7 @@ export type ProjectRuntimeModule =
   | "tests"
   | "readiness"
   | "deploy"
+  | "monitor"
   | "activity";
 
 type ProjectRuntimeQuickActionsProps = {
@@ -115,8 +117,16 @@ export default function ProjectRuntimeQuickActions({
           Deploy
         </NavLink>
 
-        <NavLink href="/activity" active={activeModule === "activity"}>
+        <NavLink
+          href={getProjectHref(projectId, "/monitor")}
+          active={activeModule === "monitor"}
+        >
           <Activity className="h-4 w-4" />
+          Monitor
+        </NavLink>
+
+        <NavLink href="/activity" active={activeModule === "activity"}>
+          <Clock3 className="h-4 w-4" />
           Activity
         </NavLink>
       </nav>
