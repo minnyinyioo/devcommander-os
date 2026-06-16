@@ -4,6 +4,7 @@ import {
   Activity,
   Bot,
   Code2,
+  FlaskConical,
   Gauge,
   LayoutDashboard,
   Layers3,
@@ -14,6 +15,7 @@ export type ProjectRuntimeModule =
   | "project"
   | "router"
   | "code"
+  | "tests"
   | "readiness"
   | "deploy"
   | "activity";
@@ -87,6 +89,14 @@ export default function ProjectRuntimeQuickActions({
         >
           <Code2 className="h-4 w-4" />
           Code Pack
+        </NavLink>
+
+        <NavLink
+          href={getProjectHref(projectId, "/tests")}
+          active={activeModule === "tests"}
+        >
+          <FlaskConical className="h-4 w-4" />
+          Tests
         </NavLink>
 
         <NavLink
