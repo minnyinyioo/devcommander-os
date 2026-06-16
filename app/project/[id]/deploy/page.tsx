@@ -1,3 +1,4 @@
+import DeploymentEventPanel from "@/components/deploy/DeploymentEventPanel";
 import ProjectDeployClient from "@/components/deploy/ProjectDeployClient";
 import ProjectRuntimeQuickActions from "@/components/project/ProjectRuntimeQuickActions";
 
@@ -19,6 +20,7 @@ export default async function ProjectDeployPage({
         projectId={projectId}
         activeModule="deploy"
       />
+      <DeploymentEventPanel projectId={projectId} />
       <ProjectDeployClient />
     </>
   );

@@ -11,13 +11,19 @@ export type AuditEventType =
   | "runtime.error"
   | "ai.route.selected"
   | "ai.route.executed"
-  | "ai.route.failed";
+  | "ai.route.failed"
+  | "deployment.preflight_passed"
+  | "deployment.started"
+  | "deployment.completed"
+  | "deployment.failed"
+  | "deployment.rollback_requested";
 
 export type AuditEntityType =
   | "project"
   | "workspace"
   | "auth"
   | "runtime"
+  | "deployment"
   | "system";
 
 export type AuditEventRecord = {
