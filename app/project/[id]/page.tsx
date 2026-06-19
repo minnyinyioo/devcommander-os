@@ -1,3 +1,4 @@
+import ProjectBeginnerGuide from "@/components/project/ProjectBeginnerGuide";
 import ProjectGuidedWorkflow from "@/components/project/ProjectGuidedWorkflow";
 import ProjectRuntimeClient from "@/components/project/ProjectRuntimeClient";
 import ProjectRuntimeQuickActions from "@/components/project/ProjectRuntimeQuickActions";
@@ -19,6 +20,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
         activeModule="project"
       />
       <ProjectGuidedWorkflow projectId={projectId} />
+      <ProjectBeginnerGuide projectId={projectId} />
       <ProjectRuntimeClient projectId={projectId} />
     </>
   );
