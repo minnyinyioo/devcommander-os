@@ -1,3 +1,4 @@
+import AiProviderStatusPanel from "@/components/ai-provider/AiProviderStatusPanel";
 import ProjectBeginnerGuide from "@/components/project/ProjectBeginnerGuide";
 import ProjectGuidedWorkflow from "@/components/project/ProjectGuidedWorkflow";
 import ProjectRuntimeClient from "@/components/project/ProjectRuntimeClient";
@@ -21,6 +22,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
       />
       <ProjectGuidedWorkflow projectId={projectId} />
       <ProjectBeginnerGuide projectId={projectId} />
+      <AiProviderStatusPanel />
       <ProjectRuntimeClient projectId={projectId} />
     </>
   );
