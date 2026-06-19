@@ -1,22 +1,24 @@
+import AiCodegenV2Panel from "@/components/ai-codegen/AiCodegenV2Panel";
 import ProjectCodePackClient from "@/components/codegen/ProjectCodePackClient";
 import ProjectRuntimeQuickActions from "@/components/project/ProjectRuntimeQuickActions";
 
-type ProjectCodePackPageProps = {
+type ProjectCodePageProps = {
   params: Promise<{
     id: string;
   }>;
 };
 
-export default async function ProjectCodePackPage({
+export default async function ProjectCodePage({
   params,
-}: ProjectCodePackPageProps) {
+}: ProjectCodePageProps) {
   const { id } = await params;
   const projectId = decodeURIComponent(id);
 
   return (
     <>
       <ProjectRuntimeQuickActions projectId={projectId} activeModule="code" />
-      <ProjectCodePackClient />
+      <AiCodegenV2Panel projectId={projectId} />
+      <ProjectCodePackClient projectId={projectId} />
     </>
   );
 }
