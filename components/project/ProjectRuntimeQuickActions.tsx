@@ -1,12 +1,6 @@
-import type { ReactNode } from "react";
 import Link from "next/link";
 import {
-  Activity,
-  Bot,
-  Clock3,
   Code2,
-  FileText,
-  FlaskConical,
   Gauge,
   LayoutDashboard,
   Layers3,
@@ -16,6 +10,10 @@ import {
 
 export type ProjectRuntimeModule =
   | "project"
+  | "build"
+  | "fix"
+  | "launch"
+  | "operate"
   | "router"
   | "code"
   | "tests"
@@ -35,26 +33,31 @@ function getProjectHref(projectId: string, suffix = ""): string {
   return `/project/${encodeURIComponent(projectId)}${suffix}`;
 }
 
-function NavLink({
-  href,
-  children,
-  active = false,
-}: {
-  href: string;
-  children: ReactNode;
-  active?: boolean;
-}) {
+function linkClass(active: boolean): string {
+  return active
+    ? "inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full bg-white px-4 text-xs font-semibold text-zinc-950 shadow-lg shadow-black/20 transition hover:bg-zinc-200"
+    : "inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-white/10 bg-white/[0.04] px-4 text-xs font-semibold text-zinc-300 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white";
+}
+
+function isBuild(activeModule: ProjectRuntimeModule): boolean {
+  return activeModule === "build" || activeModule === "router" || activeModule === "code";
+}
+
+function isFix(activeModule: ProjectRuntimeModule): boolean {
+  return activeModule === "fix" || activeModule === "tests" || activeModule === "readiness";
+}
+
+function isLaunch(activeModule: ProjectRuntimeModule): boolean {
+  return activeModule === "launch" || activeModule === "deploy";
+}
+
+function isOperate(activeModule: ProjectRuntimeModule): boolean {
   return (
-    <Link
-      href={href}
-      className={
-        active
-          ? "inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full bg-white px-4 text-xs font-semibold text-zinc-950 shadow-lg shadow-black/20 transition hover:bg-zinc-200"
-          : "inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-white/10 bg-white/[0.04] px-4 text-xs font-semibold text-zinc-300 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
-      }
-    >
-      {children}
-    </Link>
+    activeModule === "operate" ||
+    activeModule === "monitor" ||
+    activeModule === "ops" ||
+    activeModule === "handover" ||
+    activeModule === "activity"
   );
 }
 
@@ -65,90 +68,53 @@ export default function ProjectRuntimeQuickActions({
   return (
     <div className="sticky top-0 z-[90] border-b border-white/10 bg-zinc-950/90 px-4 py-3 shadow-2xl shadow-black/30 backdrop-blur-xl sm:px-6 lg:px-8">
       <nav
-        aria-label="Project runtime module navigation"
+        aria-label="DevCommander project workflow navigation"
         className="mx-auto flex max-w-7xl items-center gap-2 overflow-x-auto whitespace-nowrap"
       >
-        <NavLink href="/dashboard">
+        <Link href="/dashboard" className={linkClass(false)}>
           <LayoutDashboard className="h-4 w-4" />
           Dashboard
-        </NavLink>
+        </Link>
 
-        <NavLink
+        <Link
           href={getProjectHref(projectId)}
-          active={activeModule === "project"}
+          className={linkClass(activeModule === "project")}
         >
           <Layers3 className="h-4 w-4" />
           Project
-        </NavLink>
+        </Link>
 
-        <NavLink
-          href={getProjectHref(projectId, "/router")}
-          active={activeModule === "router"}
-        >
-          <Bot className="h-4 w-4" />
-          AI Router
-        </NavLink>
-
-        <NavLink
-          href={getProjectHref(projectId, "/code")}
-          active={activeModule === "code"}
+        <Link
+          href={getProjectHref(projectId, "/build")}
+          className={linkClass(isBuild(activeModule))}
         >
           <Code2 className="h-4 w-4" />
-          Code Pack
-        </NavLink>
+          Build
+        </Link>
 
-        <NavLink
-          href={getProjectHref(projectId, "/tests")}
-          active={activeModule === "tests"}
-        >
-          <FlaskConical className="h-4 w-4" />
-          Tests
-        </NavLink>
-
-        <NavLink
-          href={getProjectHref(projectId, "/readiness")}
-          active={activeModule === "readiness"}
+        <Link
+          href={getProjectHref(projectId, "/fix")}
+          className={linkClass(isFix(activeModule))}
         >
           <Gauge className="h-4 w-4" />
-          Readiness
-        </NavLink>
+          Fix
+        </Link>
 
-        <NavLink
-          href={getProjectHref(projectId, "/deploy")}
-          active={activeModule === "deploy"}
+        <Link
+          href={getProjectHref(projectId, "/launch")}
+          className={linkClass(isLaunch(activeModule))}
         >
           <Rocket className="h-4 w-4" />
-          Deploy
-        </NavLink>
+          Launch
+        </Link>
 
-        <NavLink
-          href={getProjectHref(projectId, "/monitor")}
-          active={activeModule === "monitor"}
-        >
-          <Activity className="h-4 w-4" />
-          Monitor
-        </NavLink>
-
-        <NavLink
-          href={getProjectHref(projectId, "/ops")}
-          active={activeModule === "ops"}
+        <Link
+          href={getProjectHref(projectId, "/operate")}
+          className={linkClass(isOperate(activeModule))}
         >
           <Wrench className="h-4 w-4" />
-          Ops
-        </NavLink>
-
-        <NavLink
-          href={getProjectHref(projectId, "/handover")}
-          active={activeModule === "handover"}
-        >
-          <FileText className="h-4 w-4" />
-          Handover
-        </NavLink>
-
-        <NavLink href="/activity" active={activeModule === "activity"}>
-          <Clock3 className="h-4 w-4" />
-          Activity
-        </NavLink>
+          Operate
+        </Link>
       </nav>
     </div>
   );
